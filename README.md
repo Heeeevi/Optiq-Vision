@@ -1,73 +1,57 @@
-# React + TypeScript + Vite
+# OptiQ Vision
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AI-powered quality control for incoming fruit and raw-material inspection. Built for the **CyberHack 2026** hackathon (Track 2: AI for Fruit & Raw-Material QC).
 
-Currently, two official plugins are available:
+## Problem
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Factories that process fruit and botanical inputs rely on manual eyeballing to grade incoming deliveries. This creates three problems:
 
-## React Compiler
+1. **Inconsistency** — different inspectors, different standards
+2. **No audit trail** — clipboard notes get lost, can't trace a defective batch back to its source
+3. **Binary thinking** — inspectors either accept or reject, losing usable Grade B/C product that could go to secondary processing
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Solution
 
-## Expanding the ESLint configuration
+OptiQ Vision replaces the clipboard with a camera-based grading workflow:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **Intake** — operator logs supplier, lot number, and commodity before scanning
+2. **Train** — show the AI a few examples of each quality grade (runs entirely in-browser via TensorFlow.js)
+3. **Inspect** — scan items one by one; each scan produces a grade (A/B/C/Reject), confidence score, and timestamped photo
+4. **Report** — complete the batch to get a summary: grade distribution, yield rate, reject rate, and exportable CSV
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Every scan is tied to a supplier and lot, so procurement teams can track supplier quality over time.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Tech Stack
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **Frontend:** React + TypeScript (Vite)
+- **ML Engine:** TensorFlow.js (MobileNet feature extractor + KNN classifier)
+- **Styling:** Vanilla CSS
+- **Runs entirely in the browser.** No backend, no API keys, no cloud dependency.
+
+## Getting Started
+
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open `http://localhost:5173`. Allow camera access when prompted.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Workflow
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+Intake Form → Train AI (optional) → Scan & Grade → Complete Batch → Export CSV
+```
+
+## Grading System
+
+| Grade | Meaning | Action |
+|-------|---------|--------|
+| A | Premium quality | Store as-is |
+| B | Minor imperfection | Standard processing |
+| C | Overripe or soft | Process immediately |
+| REJECT | Rotten, moldy, foreign object | Segregate |
+
+## License
+
+MIT

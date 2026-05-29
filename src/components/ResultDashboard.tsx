@@ -1,60 +1,57 @@
 import React from 'react';
-import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Circle } from 'lucide-react';
+import type { GradeKey, ScanRecord } from './CameraQC';
 import './ResultDashboard.css';
 
 interface ResultProps {
-  result: {
-    status: string;
-    confidence: string;
-    reason: string;
-    timestamp: string;
-  } | null;
+  result: ScanRecord | null;
 }
+
+const GRADE_ICON: Record<GradeKey, React.ReactNode> = {
+  A: <CheckCircle2 size={28} />,
+  B: <Circle size={28} />,
+  C: <AlertTriangle size={28} />,
+  REJECT: <XCircle size={28} />,
+};
+
+const GRADE_CLASS: Record<GradeKey, string> = {
+  A: 'grade-a', B: 'grade-b', C: 'grade-c', REJECT: 'grade-reject',
+};
 
 export default function ResultDashboard({ result }: ResultProps) {
   if (!result) {
     return (
       <div className="result-container empty glass-panel">
-        <div className="empty-state">
-          <div className="pulse-dot"></div>
-          <p className="text-subtle">Awaiting inspection data...</p>
-        </div>
+        <p className="text-subtle">Awaiting inspection...</p>
       </div>
     );
   }
 
-  const isPass = result.status === 'FRESH';
-
   return (
-    <div className={`result-container glass-panel animate-fade-in ${isPass ? 'status-pass' : 'status-fail'}`}>
+    <div className={`result-container glass-panel animate-fade-in`}>
       <div className="result-header">
-        <h3 className="heading-tight">Inspection Result</h3>
+        <h3 className="heading-tight">Last Inspection</h3>
         <span className="timestamp">{result.timestamp}</span>
       </div>
-      
-      <div className="result-main">
-        <div className={`status-badge ${isPass ? 'badge-pass' : 'badge-fail'}`}>
-          {isPass ? <CheckCircle2 size={32} /> : <XCircle size={32} />}
-          <span className="status-text">{result.status}</span>
+
+      <div className={`grade-badge ${GRADE_CLASS[result.grade]}`}>
+        {GRADE_ICON[result.grade]}
+        <span className="grade-text">{result.grade === 'REJECT' ? 'REJECT' : `Grade ${result.grade}`}</span>
+      </div>
+
+      <div className="result-row">
+        <div className="result-cell">
+          <span className="cell-label">Confidence</span>
+          <span className="cell-value">{result.confidence}%</span>
         </div>
-        
-        <div className="metrics-grid">
-          <div className="metric-box">
-            <span className="metric-label">Confidence</span>
-            <span className="metric-value">{result.confidence}%</span>
-          </div>
-          <div className="metric-box">
-            <span className="metric-label">Analysis</span>
-            <span className="metric-value value-small">{result.reason}</span>
-          </div>
+        <div className="result-cell">
+          <span className="cell-label">Analysis</span>
+          <span className="cell-value small">{result.reason}</span>
         </div>
       </div>
-      
-      {!isPass && (
-        <div className="alert-banner">
-          <AlertTriangle size={16} />
-          <span>Segregate immediately. Lot flagged for manual review.</span>
-        </div>
+
+      {result.snapshot && (
+        <img src={result.snapshot} alt="scan thumbnail" className="result-thumb" />
       )}
     </div>
   );

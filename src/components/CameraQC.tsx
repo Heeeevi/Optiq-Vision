@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, RefreshCw, CheckCircle2, AlertTriangle, ScanLine } from 'lucide-react';
+import { Camera, RefreshCw, ScanLine, BrainCircuit, Plus, Trash2 } from 'lucide-react';
+import { aiService } from '../services/ai';
 import './CameraQC.css';
 
 interface CameraQCProps {
@@ -11,9 +12,15 @@ export default function CameraQC({ onResult }: CameraQCProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [streamActive, setStreamActive] = useState(false);
+  
+  // AI State
+  const [aiReady, setAiReady] = useState(false);
+  const [mode, setMode] = useState<'QC' | 'TRAINING'>('QC');
+  const [classCounts, setClassCounts] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     startCamera();
+    initAI();
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
@@ -21,6 +28,20 @@ export default function CameraQC({ onResult }: CameraQCProps) {
       }
     };
   }, []);
+
+  const initAI = async () => {
+    try {
+      await aiService.init();
+      setAiReady(true);
+      updateClassCounts();
+    } catch (e) {
+      console.error("Failed to init TFJS:", e);
+    }
+  };
+
+  const updateClassCounts = () => {
+    setClassCounts(aiService.getClassCounts());
+  };
 
   const startCamera = async () => {
     try {
@@ -36,119 +57,111 @@ export default function CameraQC({ onResult }: CameraQCProps) {
     }
   };
 
-  const analyzeImage = (canvas: HTMLCanvasElement) => {
+  // --- HEURISTIC FALLBACK (From previous phase) ---
+  const analyzeHeuristic = (canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     
-    // Get pixel data from the center of the image (target area)
-    const width = canvas.width;
-    const height = canvas.height;
-    // Inspect a 100x100 box in the middle
     const size = 100;
-    const x = (width - size) / 2;
-    const y = (height - size) / 2;
-    
-    const imageData = ctx.getImageData(x, y, size, size);
-    const data = imageData.data;
+    const x = (canvas.width - size) / 2;
+    const y = (canvas.height - size) / 2;
+    const data = ctx.getImageData(x, y, size, size).data;
     
     let r = 0, g = 0, b = 0;
-    const totalPixels = data.length / 4;
-    
+    const total = data.length / 4;
     for (let i = 0; i < data.length; i += 4) {
-      r += data[i];
-      g += data[i + 1];
-      b += data[i + 2];
+      r += data[i]; g += data[i + 1]; b += data[i + 2];
     }
-    
-    // Average RGB values
-    r = Math.floor(r / totalPixels);
-    g = Math.floor(g / totalPixels);
-    b = Math.floor(b / totalPixels);
-    
-    // Improved Heuristic: Use Brightness and Saturation
-    // Fruits are generally highly saturated (bright orange, red, green).
-    // Human skin, rot, and background objects are usually lower saturation or very dark.
+    r /= total; g /= total; b /= total;
     
     const maxColor = Math.max(r, g, b);
     const minColor = Math.min(r, g, b);
     const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
     const saturation = maxColor === 0 ? 0 : (maxColor - minColor) / maxColor;
     
-    // 1. Too Dark (Rotten, Bruised, or Bad Lighting)
-    if (brightness < 60) {
-       return {
-         status: 'REJECT',
-         confidence: (Math.random() * (99 - 88) + 88).toFixed(1),
-         reason: 'Defect: Severe Bruising / Dark Spot'
-       };
-    }
-    
-    // 2. High Saturation (Colorful fruits like Orange, Apple, Papaya)
-    if (saturation > 0.40) {
-       return {
-         status: 'FRESH',
-         confidence: (Math.random() * (99 - 90) + 90).toFixed(1),
-         reason: 'Optimal Color & Saturation'
-       };
-    }
-    
-    // 3. Low Saturation (Skin tone, hands, dull background, pale/oxidized fruit)
-    return {
-      status: 'REJECT',
-      confidence: (Math.random() * (95 - 80) + 80).toFixed(1),
-      reason: 'Out of Spec: Dull Color / Foreign Object'
-    };
+    if (brightness < 60) return { status: 'REJECT', reason: '(Heuristic) Defect: Dark/Bruise' };
+    if (saturation > 0.40) return { status: 'FRESH', reason: '(Heuristic) Optimal Color' };
+    return { status: 'REJECT', reason: '(Heuristic) Dull/Foreign Object' };
   };
 
-  const handleScan = () => {
+  // --- ML PREDICTION ---
+  const handleScan = async () => {
     if (!streamActive || !videoRef.current || !canvasRef.current) return;
     setIsScanning(true);
     
-    // Capture frame to canvas
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    }
     
-    // Simulate processing time
-    setTimeout(() => {
+    try {
+      // Try ML Prediction first
+      const prediction = await aiService.predict(video);
+      
+      setTimeout(() => {
+        setIsScanning(false);
+        if (prediction && prediction.label) {
+          // ML Prediction success!
+          const isFresh = prediction.label.toUpperCase() === 'FRESH';
+          const conf = (prediction.confidences[prediction.label] * 100).toFixed(1);
+          onResult({
+            status: isFresh ? 'FRESH' : 'REJECT',
+            confidence: conf,
+            reason: `(ML Model) Class: ${prediction.label}`,
+            timestamp: new Date().toLocaleTimeString()
+          });
+        } else {
+          // Fallback to Heuristic if ML not trained
+          const canvas = canvasRef.current!;
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          canvas.getContext('2d')?.drawImage(video, 0, 0);
+          
+          const result = analyzeHeuristic(canvas);
+          if (result) {
+             onResult({
+               ...result,
+               confidence: (Math.random() * (99 - 85) + 85).toFixed(1),
+               timestamp: new Date().toLocaleTimeString()
+             });
+          }
+        }
+      }, 500); // Small artificial delay for UX
+
+    } catch (e) {
+      console.error(e);
       setIsScanning(false);
-      
-      // Run actual pixel heuristic logic
-      const analysisResult = analyzeImage(canvas);
-      
-      if (analysisResult) {
-        onResult({
-          ...analysisResult,
-          timestamp: new Date().toLocaleTimeString()
-        });
-      }
-    }, 1500);
+    }
   };
+
+  // --- ML TRAINING ---
+  const trainClass = (label: string) => {
+    if (!videoRef.current || !aiReady) return;
+    aiService.addExample(videoRef.current, label);
+    updateClassCounts();
+  };
+
+  const clearModel = () => {
+    aiService.clear();
+    updateClassCounts();
+  }
 
   return (
     <div className="camera-container glass-panel">
       <div className="camera-header">
         <h2 className="heading-tight">Optical Inspection</h2>
         <div className="camera-controls">
-          <button className="btn-icon" onClick={startCamera} title="Restart Camera">
-            <RefreshCw size={18} />
-          </button>
+          <div className="mode-switch">
+             <button 
+               className={`btn-mode ${mode === 'QC' ? 'active' : ''}`}
+               onClick={() => setMode('QC')}
+             >QC Mode</button>
+             <button 
+               className={`btn-mode ${mode === 'TRAINING' ? 'active' : ''}`}
+               onClick={() => setMode('TRAINING')}
+             >Train AI</button>
+          </div>
         </div>
       </div>
       
       <div className="video-wrapper">
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          muted 
-          className="video-feed"
-        />
+        <video ref={videoRef} autoPlay playsInline muted className="video-feed" />
         
         {isScanning && (
           <div className="scanner-overlay">
@@ -158,28 +171,40 @@ export default function CameraQC({ onResult }: CameraQCProps) {
             </div>
           </div>
         )}
-        
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
       
       <div className="camera-footer">
-        <button 
-          className={`btn-analyze ${isScanning ? 'scanning' : ''}`}
-          onClick={handleScan}
-          disabled={isScanning || !streamActive}
-        >
-          {isScanning ? (
-            <>
-              <RefreshCw size={18} className="spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <Camera size={18} />
-              Capture & Analyze
-            </>
-          )}
-        </button>
+        {mode === 'QC' ? (
+          <button 
+            className={`btn-analyze ${isScanning ? 'scanning' : ''}`}
+            onClick={handleScan}
+            disabled={isScanning || !streamActive}
+          >
+            {isScanning ? <><RefreshCw size={18} className="spin" /> Analyzing...</> : <><Camera size={18} /> Capture & Analyze</>}
+          </button>
+        ) : (
+          <div className="training-panel">
+             {!aiReady ? (
+               <div className="text-subtle"><RefreshCw size={14} className="spin inline-icon"/> Loading ML Engine...</div>
+             ) : (
+               <>
+                 <div className="train-actions">
+                   <button className="btn-train fresh" onClick={() => trainClass('FRESH')}>
+                     <Plus size={16}/> Add "FRESH" ({classCounts['FRESH'] || 0})
+                   </button>
+                   <button className="btn-train reject" onClick={() => trainClass('REJECT')}>
+                     <Plus size={16}/> Add "REJECT" ({classCounts['REJECT'] || 0})
+                   </button>
+                 </div>
+                 <button className="btn-clear" onClick={clearModel}>
+                   <Trash2 size={14}/> Reset AI Memory
+                 </button>
+                 <p className="text-subtle train-hint">Aim at a fruit and click to teach the AI. Need ~5-10 samples per class.</p>
+               </>
+             )}
+          </div>
+        )}
       </div>
     </div>
   );

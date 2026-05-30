@@ -45,7 +45,7 @@ function App() {
 
   const handleCompleteBatch = () => {
     if (batchMeta) {
-      saveBatch(batchMeta, records);
+      saveBatch(batchMeta, records, session?.name, session?.role);
     }
     setPhase('REPORT');
   };

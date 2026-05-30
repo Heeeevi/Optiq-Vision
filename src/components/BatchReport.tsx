@@ -1,4 +1,4 @@
-import React from 'react';
+
 import type { GradeKey, ScanRecord } from './CameraQC';
 import type { BatchMeta } from './IntakeForm';
 import { Download, ArrowLeft } from 'lucide-react';

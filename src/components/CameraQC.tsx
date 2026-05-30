@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Camera, RefreshCw, ScanLine, Plus, Trash2 } from 'lucide-react';
+import { useRef, useState, useEffect } from 'react';
+import { Camera, RefreshCw, Plus, Trash2 } from 'lucide-react';
 import { aiService } from '../services/ai';
 import './CameraQC.css';
 

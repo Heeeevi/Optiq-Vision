@@ -1,0 +1,70 @@
+.history-page {
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+  min-height: 100vh;
+}
+
+.history-panel {
+  width: 100%;
+  max-width: 900px;
+  padding: 32px;
+  height: fit-content;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.history-header h1 {
+  font-size: 1.25rem;
+  margin-bottom: 4px;
+}
+
+.empty-state {
+  padding: 48px;
+  text-align: center;
+}
+
+.batch-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.bt-header {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 0.7fr 0.7fr 1.2fr;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bt-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 0.7fr 0.7fr 1.2fr;
+  gap: 12px;
+  padding: 12px;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.bt-row:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.bt-lot {
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.yield-good { color: #22c55e; font-weight: 600; }
+.yield-warn { color: #eab308; font-weight: 600; }

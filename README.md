@@ -1,32 +1,33 @@
 # OptiQ Vision
 
-AI-powered quality control for incoming fruit and raw-material inspection. Built for the **CyberHack 2026** hackathon (Track 2: AI for Fruit & Raw-Material QC).
+AI-powered quality control for incoming fruit and raw-material inspection. Built for **CyberHack 2026** (Track 2: AI for Fruit & Raw-Material QC).
 
 ## Problem
 
-Factories that process fruit and botanical inputs rely on manual eyeballing to grade incoming deliveries. This creates three problems:
-
-1. **Inconsistency** — different inspectors, different standards
-2. **No audit trail** — clipboard notes get lost, can't trace a defective batch back to its source
-3. **Binary thinking** — inspectors either accept or reject, losing usable Grade B/C product that could go to secondary processing
+Sima Arome's incoming QC relies on manual eyeballing — inconsistent grading, zero audit trail, and binary pass/fail decisions that waste usable product.
 
 ## Solution
 
 OptiQ Vision replaces the clipboard with a camera-based grading workflow:
 
-1. **Intake** — operator logs supplier, lot number, and commodity before scanning
-2. **Train** — show the AI a few examples of each quality grade (runs entirely in-browser via TensorFlow.js)
-3. **Inspect** — scan items one by one; each scan produces a grade (A/B/C/Reject), confidence score, and timestamped photo
-4. **Report** — complete the batch to get a summary: grade distribution, yield rate, reject rate, and exportable CSV
+1. **Login** — role-based access (Admin / Operator)
+2. **Intake** — log supplier, lot number, and commodity
+3. **Train** — teach the AI quality grades using your own samples (runs in-browser via TensorFlow.js)
+4. **Inspect** — scan items with the camera; each scan produces a grade (A/B/C/Reject), confidence, and timestamped photo
+5. **Report** — batch summary with grade distribution, yield/reject rate, photo evidence, and CSV export
+6. **Analytics** — supplier scorecard tracks reject rates across batches
 
-Every scan is tied to a supplier and lot, so procurement teams can track supplier quality over time.
+Every scan is tied to a supplier and lot for full traceability.
 
 ## Tech Stack
 
-- **Frontend:** React + TypeScript (Vite)
-- **ML Engine:** TensorFlow.js (MobileNet feature extractor + KNN classifier)
-- **Styling:** Vanilla CSS
-- **Runs entirely in the browser.** No backend, no API keys, no cloud dependency.
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React + TypeScript (Vite) |
+| ML Engine | TensorFlow.js — MobileNet v2 + KNN Classifier |
+| Styling | Vanilla CSS |
+| Persistence | Browser localStorage |
+| Runtime | 100% client-side — no backend, no API keys |
 
 ## Getting Started
 
@@ -35,13 +36,14 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. Allow camera access when prompted.
+Open `https://localhost:5173`. Allow camera access when prompted.
 
-## Workflow
+## User Roles
 
-```
-Intake Form → Train AI (optional) → Scan & Grade → Complete Batch → Export CSV
-```
+| Role | Access |
+|------|--------|
+| **Operator** | Intake → Scan → Report |
+| **Admin** | Dashboard + Batch History + Supplier Scorecard + Intake → Scan → Report |
 
 ## Grading System
 
@@ -51,6 +53,10 @@ Intake Form → Train AI (optional) → Scan & Grade → Complete Batch → Expo
 | B | Minor imperfection | Standard processing |
 | C | Overripe or soft | Process immediately |
 | REJECT | Rotten, moldy, foreign object | Segregate |
+
+## Screenshots
+
+_See demo video for full walkthrough._
 
 ## License
 

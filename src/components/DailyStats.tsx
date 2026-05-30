@@ -1,4 +1,4 @@
-import React from 'react';
+
 import type { GradeKey, ScanRecord } from './CameraQC';
 import './DailyStats.css';
 

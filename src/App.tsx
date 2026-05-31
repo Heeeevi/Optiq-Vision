@@ -164,7 +164,7 @@ function App() {
       </header>
 
       <main className="main-col">
-        <CameraQC onResult={handleResult} />
+        <CameraQC onResult={handleResult} operatorName={session?.name} />
       </main>
 
       <aside className="side-col">

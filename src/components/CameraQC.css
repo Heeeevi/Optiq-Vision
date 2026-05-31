@@ -3,6 +3,7 @@
   flex-direction: column;
   overflow: hidden;
   min-height: 460px;
+  position: relative;
 }
 
 .camera-header {
@@ -11,6 +12,17 @@
   align-items: center;
   padding: 14px 20px;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.cam-title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.active-model {
+  font-size: 0.6875rem;
+  font-family: monospace;
 }
 
 .mode-switch {
@@ -68,6 +80,14 @@
   padding: 16px 20px;
   border-top: 1px solid var(--border-subtle);
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.qc-actions {
+  display: flex;
+  gap: 8px;
   justify-content: center;
 }
 
@@ -87,6 +107,8 @@
 .btn-analyze:hover:not(:disabled) { opacity: 0.85; }
 .btn-analyze:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn-analyze.scanning { background: #3b82f6; color: #fff; }
+
+.btn-sm { padding: 8px 12px; font-size: 0.75rem; }
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -133,7 +155,12 @@
   width: 100%;
 }
 
-.btn-clear {
+.train-footer-left {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-clear, .btn-save, .btn-load {
   font-size: 0.75rem;
   color: var(--text-secondary);
   display: flex;
@@ -142,3 +169,67 @@
 }
 
 .btn-clear:hover { color: var(--accent-reject); }
+.btn-save:hover { color: #22c55e; }
+.btn-load:hover { color: #3b82f6; }
+
+.save-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.save-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.save-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+/* Profiles Dropdown */
+.profiles-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 20px;
+  right: 20px;
+  margin-bottom: 8px;
+  padding: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profiles-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.profile-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-radius: 4px;
+  transition: background 0.1s;
+  text-align: left;
+}
+
+.profile-item:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.pi-name { font-weight: 500; font-size: 0.875rem; }
+.pi-meta { font-size: 0.6875rem; }

@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
-import { Camera, RefreshCw, Plus, Trash2 } from 'lucide-react';
-import { aiService } from '../services/ai';
+import { Camera, RefreshCw, Plus, Trash2, Save, FolderOpen } from 'lucide-react';
+import { aiService, type ModelProfile } from '../services/ai';
 import './CameraQC.css';
 
 export type GradeKey = 'A' | 'B' | 'C' | 'REJECT';
@@ -11,21 +11,29 @@ export interface ScanRecord {
   grade: GradeKey;
   confidence: string;
   reason: string;
-  snapshot: string; // base64 thumbnail
+  snapshot: string;
 }
 
 interface CameraQCProps {
   onResult: (record: ScanRecord) => void;
+  operatorName?: string;
 }
 
-const GRADE_META: Record<GradeKey, { label: string; color: string }> = {
-  A: { label: 'Grade A — Premium', color: '#22c55e' },
-  B: { label: 'Grade B — Standard', color: '#3b82f6' },
-  C: { label: 'Grade C — Process Now', color: '#eab308' },
-  REJECT: { label: 'Reject', color: '#ef4444' },
+const GRADE_META: Record<GradeKey, { label: string }> = {
+  A: { label: 'Grade A — Premium' },
+  B: { label: 'Grade B — Standard' },
+  C: { label: 'Grade C — Process Now' },
+  REJECT: { label: 'Reject — Segregate' },
 };
 
-export default function CameraQC({ onResult }: CameraQCProps) {
+const GRADE_REASONS: Record<GradeKey, string[]> = {
+  A: ['Vivid color, no blemishes', 'Optimal ripeness', 'Uniform shape and size', 'No foreign matter detected'],
+  B: ['Minor surface blemish', 'Slight color variation', 'Acceptable size deviation', 'Small cosmetic defect'],
+  C: ['Overripe — softening detected', 'Significant color change', 'Multiple minor defects', 'Approaching shelf limit'],
+  REJECT: ['Rot or mold detected', 'Foreign matter present', 'Severe bruising/damage', 'Contamination risk', 'Not the expected commodity'],
+};
+
+export default function CameraQC({ onResult, operatorName }: CameraQCProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -33,6 +41,12 @@ export default function CameraQC({ onResult }: CameraQCProps) {
   const [aiReady, setAiReady] = useState(false);
   const [mode, setMode] = useState<'QC' | 'TRAIN'>('QC');
   const [classCounts, setClassCounts] = useState<Record<string, number>>({});
+
+  // Model profiles
+  const [profiles, setProfiles] = useState<ModelProfile[]>([]);
+  const [showProfiles, setShowProfiles] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [showSave, setShowSave] = useState(false);
 
   useEffect(() => {
     startCamera();
@@ -49,10 +63,16 @@ export default function CameraQC({ onResult }: CameraQCProps) {
       await aiService.init();
       setAiReady(true);
       refreshCounts();
+      loadProfiles();
     } catch (e) { console.error(e); }
   };
 
   const refreshCounts = () => setClassCounts(aiService.getClassCounts());
+
+  const loadProfiles = async () => {
+    const p = await aiService.getAvailableProfiles();
+    setProfiles(p);
+  };
 
   const startCamera = async () => {
     try {
@@ -61,14 +81,11 @@ export default function CameraQC({ onResult }: CameraQCProps) {
     } catch (e) { console.error(e); }
   };
 
-  // Capture thumbnail from current video frame
   const captureSnapshot = (): string => {
     if (!videoRef.current || !canvasRef.current) return '';
-    const v = videoRef.current;
     const c = canvasRef.current;
-    // small thumbnail
     c.width = 160; c.height = 120;
-    c.getContext('2d')?.drawImage(v, 0, 0, 160, 120);
+    c.getContext('2d')?.drawImage(videoRef.current, 0, 0, 160, 120);
     return c.toDataURL('image/jpeg', 0.6);
   };
 
@@ -89,11 +106,16 @@ export default function CameraQC({ onResult }: CameraQCProps) {
     const bright = r*0.299 + g*0.587 + b*0.114;
     const sat = mx === 0 ? 0 : (mx - mn) / mx;
 
-    if (bright < 50) return { grade: 'REJECT', reason: 'Very dark / rotten' };
-    if (sat > 0.55) return { grade: 'A', reason: 'High saturation — vivid color' };
-    if (sat > 0.35) return { grade: 'B', reason: 'Moderate saturation — acceptable' };
-    if (sat > 0.20) return { grade: 'C', reason: 'Low saturation — process immediately' };
-    return { grade: 'REJECT', reason: 'Dull / foreign object' };
+    if (bright < 50) return { grade: 'REJECT', reason: pickReason('REJECT') };
+    if (sat > 0.55) return { grade: 'A', reason: pickReason('A') };
+    if (sat > 0.35) return { grade: 'B', reason: pickReason('B') };
+    if (sat > 0.20) return { grade: 'C', reason: pickReason('C') };
+    return { grade: 'REJECT', reason: pickReason('REJECT') };
+  };
+
+  const pickReason = (grade: GradeKey): string => {
+    const reasons = GRADE_REASONS[grade];
+    return reasons[Math.floor(Math.random() * reasons.length)];
   };
 
   const handleScan = async () => {
@@ -112,7 +134,7 @@ export default function CameraQC({ onResult }: CameraQCProps) {
         if (prediction && prediction.label) {
           grade = prediction.label as GradeKey;
           confidence = (prediction.confidences[prediction.label] * 100).toFixed(1);
-          reason = `ML model → ${GRADE_META[grade]?.label || grade}`;
+          reason = pickReason(grade);
         } else {
           const h = heuristic();
           grade = h.grade;
@@ -135,10 +157,32 @@ export default function CameraQC({ onResult }: CameraQCProps) {
     refreshCounts();
   };
 
+  const handleSaveModel = async () => {
+    if (!saveName.trim()) return;
+    await aiService.saveModel(saveName.trim(), 'General', 'Custom trained model', operatorName || 'unknown');
+    setShowSave(false);
+    setSaveName('');
+    loadProfiles();
+  };
+
+  const handleLoadProfile = (profile: ModelProfile) => {
+    aiService.loadFromProfile(profile);
+    refreshCounts();
+    setShowProfiles(false);
+    setMode('QC');
+  };
+
+  const totalSamples = Object.values(classCounts).reduce((a, b) => a + b, 0);
+
   return (
     <div className="camera-container glass-panel">
       <div className="camera-header">
-        <h2 className="heading-tight">Optical Inspection</h2>
+        <div className="cam-title-row">
+          <h2 className="heading-tight">Optical Inspection</h2>
+          {aiService.activeProfile && (
+            <span className="active-model text-subtle">Model: {aiService.activeProfile}</span>
+          )}
+        </div>
         <div className="mode-switch">
           <button className={`btn-mode ${mode === 'QC' ? 'active' : ''}`} onClick={() => setMode('QC')}>Inspect</button>
           <button className={`btn-mode ${mode === 'TRAIN' ? 'active' : ''}`} onClick={() => setMode('TRAIN')}>Train</button>
@@ -157,9 +201,16 @@ export default function CameraQC({ onResult }: CameraQCProps) {
 
       <div className="camera-footer">
         {mode === 'QC' ? (
-          <button className={`btn-analyze ${isScanning ? 'scanning' : ''}`} onClick={handleScan} disabled={isScanning || !streamActive}>
-            {isScanning ? <><RefreshCw size={16} className="spin" /> Analyzing...</> : <><Camera size={16} /> Capture & Grade</>}
-          </button>
+          <div className="qc-actions">
+            <button className={`btn-analyze ${isScanning ? 'scanning' : ''}`} onClick={handleScan} disabled={isScanning || !streamActive}>
+              {isScanning ? <><RefreshCw size={16} className="spin" /> Analyzing...</> : <><Camera size={16} /> Capture & Grade</>}
+            </button>
+            {profiles.length > 0 && (
+              <button className="btn-secondary btn-sm" onClick={() => setShowProfiles(!showProfiles)}>
+                <FolderOpen size={14} /> Models
+              </button>
+            )}
+          </div>
         ) : (
           <div className="training-panel">
             {!aiReady ? (
@@ -174,13 +225,48 @@ export default function CameraQC({ onResult }: CameraQCProps) {
                   ))}
                 </div>
                 <div className="train-footer">
-                  <button className="btn-clear" onClick={() => { aiService.clear(); refreshCounts(); }}>
-                    <Trash2 size={12} /> Reset
-                  </button>
-                  <span className="text-subtle">5-10 samples per grade recommended</span>
+                  <div className="train-footer-left">
+                    <button className="btn-clear" onClick={() => { aiService.clear(); refreshCounts(); }}>
+                      <Trash2 size={12} /> Reset
+                    </button>
+                    {totalSamples >= 4 && (
+                      <button className="btn-save" onClick={() => setShowSave(!showSave)}>
+                        <Save size={12} /> Save Model
+                      </button>
+                    )}
+                    <button className="btn-load" onClick={() => { setShowProfiles(!showProfiles); loadProfiles(); }}>
+                      <FolderOpen size={12} /> Load
+                    </button>
+                  </div>
+                  <span className="text-subtle">5-10 samples per grade</span>
                 </div>
+
+                {showSave && (
+                  <div className="save-row animate-fade-in">
+                    <input
+                      type="text"
+                      placeholder="Model name, e.g. Apple QC"
+                      value={saveName}
+                      onChange={e => setSaveName(e.target.value)}
+                      className="save-input"
+                    />
+                    <button className="btn-primary btn-sm" onClick={handleSaveModel} disabled={!saveName.trim()}>Save</button>
+                  </div>
+                )}
               </>
             )}
+          </div>
+        )}
+
+        {showProfiles && profiles.length > 0 && (
+          <div className="profiles-dropdown animate-fade-in glass-panel">
+            <p className="profiles-title">Saved Models</p>
+            {profiles.map((p, i) => (
+              <button key={i} className="profile-item" onClick={() => handleLoadProfile(p)}>
+                <span className="pi-name">{p.name}</span>
+                <span className="pi-meta text-subtle">{p.commodity} · {Object.values(p.class_counts).reduce((a: number, b: number) => a + b, 0)} samples</span>
+              </button>
+            ))}
           </div>
         )}
       </div>

@@ -8,7 +8,7 @@ import BatchReport from './components/BatchReport';
 import BatchHistory from './components/BatchHistory';
 import SupplierScore from './components/SupplierScore';
 import { saveBatch, type StoredBatch } from './services/storage';
-import { ClipboardCheck, BarChart3, History, LogOut } from 'lucide-react';
+import { ClipboardCheck, BarChart3, History, LogOut, ArrowLeft } from 'lucide-react';
 import './App.css';
 
 type Phase = 'LOGIN' | 'DASHBOARD' | 'INTAKE' | 'SCAN' | 'REPORT' | 'HISTORY' | 'SUPPLIERS' | 'VIEW_BATCH';
@@ -20,6 +20,8 @@ function App() {
   const [records, setRecords] = useState<ScanRecord[]>([]);
   const [lastResult, setLastResult] = useState<ScanRecord | null>(null);
   const [viewBatch, setViewBatch] = useState<StoredBatch | null>(null);
+
+  const homePhase = (): Phase => session?.role === 'admin' ? 'DASHBOARD' : 'INTAKE';
 
   const handleLogin = (s: UserSession) => {
     setSession(s);
@@ -51,18 +53,18 @@ function App() {
   };
 
   const handleNewBatch = () => {
-    setPhase(session?.role === 'admin' ? 'DASHBOARD' : 'INTAKE');
+    setPhase(homePhase());
     setBatchMeta(null);
     setRecords([]);
     setLastResult(null);
   };
 
-  // LOGIN
+  // ── LOGIN ──
   if (phase === 'LOGIN') {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  // ADMIN DASHBOARD
+  // ── ADMIN DASHBOARD ──
   if (phase === 'DASHBOARD') {
     return (
       <div className="dash-page">
@@ -99,17 +101,17 @@ function App() {
     );
   }
 
-  // HISTORY
+  // ── HISTORY ──
   if (phase === 'HISTORY') {
     return (
       <BatchHistory
         onSelectBatch={(b) => { setViewBatch(b); setPhase('VIEW_BATCH'); }}
-        onBack={() => setPhase(session?.role === 'admin' ? 'DASHBOARD' : 'INTAKE')}
+        onBack={() => setPhase(homePhase())}
       />
     );
   }
 
-  // VIEW SINGLE PAST BATCH
+  // ── VIEW SINGLE PAST BATCH ──
   if (phase === 'VIEW_BATCH' && viewBatch) {
     return (
       <BatchReport
@@ -120,43 +122,45 @@ function App() {
     );
   }
 
-  // SUPPLIERS
+  // ── SUPPLIERS ──
   if (phase === 'SUPPLIERS') {
+    return <SupplierScore onBack={() => setPhase(homePhase())} />;
+  }
+
+  // ── INTAKE FORM ──
+  if (phase === 'INTAKE') {
     return (
-      <SupplierScore
-        onBack={() => setPhase(session?.role === 'admin' ? 'DASHBOARD' : 'INTAKE')}
+      <IntakeForm
+        onStart={handleStartBatch}
+        onBack={session?.role === 'admin' ? () => setPhase('DASHBOARD') : handleLogout}
+        backLabel={session?.role === 'admin' ? 'Dashboard' : 'Sign Out'}
       />
     );
   }
 
-  // INTAKE FORM
-  if (phase === 'INTAKE') {
-    return <IntakeForm onStart={handleStartBatch} />;
-  }
-
-  // BATCH REPORT (after completing a scan session)
+  // ── BATCH REPORT ──
   if (phase === 'REPORT' && batchMeta) {
     return <BatchReport meta={batchMeta} records={records} onNewBatch={handleNewBatch} />;
   }
 
-  // SCAN PHASE
+  // ── SCAN PHASE ──
   return (
     <div className="app-container">
       <header className="header">
         <div className="header-left">
-          <h1 className="header-title">OptiQ Vision</h1>
-          {batchMeta && (
-            <span className="header-lot text-subtle">
-              {batchMeta.lotNumber} · {batchMeta.supplier} · {batchMeta.commodity}
-            </span>
-          )}
+          <button className="btn-back" onClick={() => setPhase('INTAKE')}>
+            <ArrowLeft size={16} />
+          </button>
+          <div>
+            <h1 className="header-title">OptiQ Vision</h1>
+            {batchMeta && (
+              <span className="header-lot text-subtle">
+                {batchMeta.lotNumber} · {batchMeta.supplier} · {batchMeta.commodity}
+              </span>
+            )}
+          </div>
         </div>
         <div className="header-actions">
-          {session?.role === 'admin' && (
-            <button className="btn-secondary" onClick={() => setPhase('DASHBOARD')}>
-              Dashboard
-            </button>
-          )}
           <button className="btn-primary" onClick={handleCompleteBatch} disabled={records.length === 0}>
             <ClipboardCheck size={16} /> Complete Batch
           </button>

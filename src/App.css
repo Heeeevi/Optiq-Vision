@@ -27,8 +27,20 @@
 
 .header-left {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-back {
+  color: var(--text-secondary);
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-back:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.06);
 }
 
 .header-title {

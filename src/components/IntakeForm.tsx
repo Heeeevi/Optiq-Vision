@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import './IntakeForm.css';
 
 export interface BatchMeta {
@@ -12,6 +12,8 @@ export interface BatchMeta {
 
 interface IntakeFormProps {
   onStart: (meta: BatchMeta) => void;
+  onBack?: () => void;
+  backLabel?: string;
 }
 
 const COMMODITIES = [
@@ -20,7 +22,7 @@ const COMMODITIES = [
   'Turmeric', 'Other'
 ];
 
-export default function IntakeForm({ onStart }: IntakeFormProps) {
+export default function IntakeForm({ onStart, onBack, backLabel }: IntakeFormProps) {
   const [supplier, setSupplier] = useState('');
   const [lotNumber, setLotNumber] = useState(
     `LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
@@ -46,7 +48,14 @@ export default function IntakeForm({ onStart }: IntakeFormProps) {
     <div className="intake-page">
       <div className="intake-card glass-panel">
         <div className="intake-header">
-          <h1 className="heading-tight">New Intake Batch</h1>
+          <div className="intake-header-top">
+            <h1 className="heading-tight">New Intake Batch</h1>
+            {onBack && (
+              <button type="button" className="btn-secondary btn-sm" onClick={onBack}>
+                <ArrowLeft size={14} /> {backLabel || 'Back'}
+              </button>
+            )}
+          </div>
           <p className="text-subtle">Record incoming lot details before starting quality inspection.</p>
         </div>
 

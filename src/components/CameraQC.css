@@ -233,3 +233,25 @@
 
 .pi-name { font-weight: 500; font-size: 0.875rem; }
 .pi-meta { font-size: 0.6875rem; }
+
+/* AI Status */
+.ai-status {
+  font-size: 0.625rem;
+}
+
+.ai-ready {
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.train-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+

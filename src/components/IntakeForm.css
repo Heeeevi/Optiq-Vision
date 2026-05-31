@@ -16,6 +16,12 @@
   margin-bottom: 32px;
 }
 
+.intake-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .intake-header h1 {
   font-size: 1.5rem;
   margin-bottom: 8px;

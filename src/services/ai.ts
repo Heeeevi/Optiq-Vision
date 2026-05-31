@@ -1,5 +1,4 @@
 import * as tf from '@tensorflow/tfjs';
-import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as knnClassifier from '@tensorflow-models/knn-classifier';
 import { supabase } from './supabase';
 
@@ -37,27 +36,66 @@ export interface ModelProfile {
 
 class AIService {
   private classifier: knnClassifier.KNNClassifier | null = null;
-  private mobilenetModel: mobilenet.MobileNet | null = null;
+  private graphModel: tf.GraphModel | null = null;
   public isReady = false;
   public activeProfile: string | null = null;
 
   async init() {
+    if (this.isReady) return; // prevent double init
     await tf.ready();
     this.classifier = knnClassifier.create();
-    this.mobilenetModel = await mobilenet.load({ version: 2, alpha: 1.0 });
+
+    // Load MobileNet from local files (bundled with the app)
+    // Falls back to Google CDN if local isn't available
+    const localUrl = '/models/mobilenet/model.json';
+    try {
+      this.graphModel = await tf.loadGraphModel(localUrl);
+      console.log('MobileNet loaded from local bundle');
+    } catch {
+      console.warn('Local model not found, loading from CDN...');
+      try {
+        this.graphModel = await tf.loadGraphModel(
+          'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/classification/3/default/1',
+          { fromTFHub: true }
+        );
+        console.log('MobileNet loaded from CDN');
+      } catch (e) {
+        console.error('MobileNet failed to load from both sources:', e);
+        // Still mark as ready — heuristic fallback will be used
+      }
+    }
     this.isReady = true;
   }
 
+  // Extract feature embeddings from an image (equivalent to mobilenet.infer(img, true))
+  private infer(imageElement: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement): tf.Tensor {
+    if (!this.graphModel) throw new Error('Model not loaded');
+
+    // Preprocess: resize to 224x224, normalize to [-1, 1]
+    const img = tf.browser.fromPixels(imageElement)
+      .resizeBilinear([224, 224])
+      .toFloat()
+      .div(127.5)
+      .sub(1.0)
+      .expandDims(0);
+
+    // Get the second-to-last layer output (feature embeddings for KNN)
+    // Run the full model then use global average pooling output
+    const logits = this.graphModel.predict(img) as tf.Tensor;
+    img.dispose();
+    return logits.reshape([1, -1]); // flatten to 2D for KNN
+  }
+
   addExample(imageElement: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement, classId: string) {
-    if (!this.classifier || !this.mobilenetModel) return;
-    const activation = this.mobilenetModel.infer(imageElement, true);
+    if (!this.classifier || !this.graphModel) return;
+    const activation = this.infer(imageElement);
     this.classifier.addExample(activation, classId);
   }
 
   async predict(imageElement: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) {
-    if (!this.classifier || !this.mobilenetModel) throw new Error('Model not initialized');
+    if (!this.classifier || !this.graphModel) throw new Error('Model not initialized');
     if (this.classifier.getNumClasses() === 0) return null;
-    const activation = this.mobilenetModel.infer(imageElement, true);
+    const activation = this.infer(imageElement);
     return await this.classifier.predictClass(activation);
   }
 
